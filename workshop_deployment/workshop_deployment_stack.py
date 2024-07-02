@@ -5,13 +5,12 @@ from aws_cdk import (
     aws_apigatewayv2_integrations as apigatewayv2_integrations,
     aws_cognito as cognito,
     aws_iam as iam,
-    aws_sagemaker as sagemaker,
     CfnParameter,
     CfnOutput,
     App,
+    Duration
 )
 from constructs import Construct
-
 
 class WorkshopDeploymentStack(Stack):
 
@@ -56,8 +55,7 @@ class WorkshopDeploymentStack(Stack):
                                                       flows=cognito.OAuthFlows(
                                                           authorization_code_grant=True
                                                       ),
-                                                      callback_urls=[f"{api.url}invoke"],
-                                                      logout_urls=[f"{api.url}invoke"]
+                                                      callback_urls=[f"{api.url}invoke"]
                                                   ))
 
         # Identity Pool
@@ -100,15 +98,22 @@ class WorkshopDeploymentStack(Stack):
                                            handler="index.lambda_handler",
                                            code=_lambda.Code.from_asset("lambda"),
                                            layers=[requests_layer],
+                                           timeout=Duration.seconds(10),
                                            environment={
                                                'CLIENT_ID': user_pool_client.user_pool_client_id,
                                                'COGNITO_DOMAIN': f"{user_pool_domain_prefix}.auth.{region_param.value_as_string}.amazoncognito.com",
                                                'IDENTITY_POOL_ID': identity_pool.ref,
                                                'CUSTOM_AWS_REGION': region_param.value_as_string,
-                                               'STUDIO_DOMAIN_ID': '',  # Update if needed
+                                               'STUDIO_DOMAIN_ID': 'd-qia0xknhnmu5',  # Update if needed
                                                'USER_POOL_ID': user_pool.user_pool_id,
                                                'REDIRECT_URI': f"{api.url}invoke",
                                            })
+
+        # Add necessary IAM policy statement to the Lambda role
+        lambda_redirect.add_to_role_policy(iam.PolicyStatement(
+            actions=["sagemaker:CreatePresignedDomainUrl"],
+            resources=["*"]
+        ))
 
         # Output the Lambda function ARN
         CfnOutput(self, "LambdaFunctionArn", value=lambda_redirect.function_arn)
@@ -119,7 +124,7 @@ class WorkshopDeploymentStack(Stack):
         # Adding a default route to the API Gateway that integrates with Lambda
         api.add_routes(
             path="/invoke",
-            methods=[apigatewayv2.HttpMethod.GET],
+            methods=[apigatewayv2.HttpMethod.ANY],
             integration=lambda_integration
         )
 

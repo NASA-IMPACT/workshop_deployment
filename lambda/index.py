@@ -110,7 +110,10 @@ def get_aws_credentials(id_token):
                 f'cognito-idp.{CUSTOM_AWS_REGION}.amazonaws.com/{USER_POOL_ID}': id_token
             }
         )
+        logger.info("Identity Response: %s", identity_response)
+        
         identity_id = identity_response['IdentityId']
+        logger.info("Identity ID: %s", identity_id)
         
         credentials_response = client.get_credentials_for_identity(
             IdentityId=identity_id,
@@ -118,6 +121,8 @@ def get_aws_credentials(id_token):
                 f'cognito-idp.{CUSTOM_AWS_REGION}.amazonaws.com/{USER_POOL_ID}': id_token
             }
         )
+        logger.info("Credentials Response: %s", credentials_response)
+        
         return credentials_response['Credentials']
     except Exception as e:
         logger.error("Failed to get AWS credentials: %s", str(e))
@@ -144,6 +149,8 @@ def generate_presigned_domain_url(region_name, domain_id, user_profile_name, exp
             UserProfileName=user_profile_name,
             SessionExpirationDurationInSeconds=expiration
         )
+        logger.info("Presigned URL Response: %s", response)
+        
         return response['AuthorizedUrl']
     except boto3.exceptions.Boto3Error as e:
         logger.error(f"Error generating presigned URL: {e}")
