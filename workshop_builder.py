@@ -153,10 +153,12 @@ if __name__ == "__main__":
     aws_sign_in()
     region = set_aws_region()
 
+while True:
     action = input("Would you like to create or destroy a workshop? (create/destroy): ").strip().lower()
-    if action not in ['create', 'destroy']:
+    if action in ['create', 'destroy']:
+        break  # Exit the loop if input is valid
+    else:
         print("Invalid action. Please enter 'create' or 'destroy'.")
-        sys.exit(1)
 
     if action == 'create':
         parameters = gather_parameters(region)
