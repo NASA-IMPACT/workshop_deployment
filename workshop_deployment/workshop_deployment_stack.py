@@ -5,10 +5,12 @@ from aws_cdk import (
     aws_apigatewayv2_integrations as apigatewayv2_integrations,
     aws_cognito as cognito,
     aws_iam as iam,
+    aws_sagemaker as sagemaker,
     CfnParameter,
     CfnOutput,
     App,
-    Duration
+    Duration,
+    RemovalPolicy
 )
 from constructs import Construct
 
@@ -21,6 +23,12 @@ class WorkshopDeploymentStack(Stack):
         region_param = CfnParameter(self, "AWSRegion",
                                     type="String",
                                     description="The AWS region for the resources")
+        vpc_id_param = CfnParameter(self, "VPCID",
+                                    type="String",
+                                    description="The VPC ID for the SageMaker Domain")
+        subnet_ids_param = CfnParameter(self, "SubnetIDs",
+                                        type="List<String>",
+                                        description="The Subnet IDs for the SageMaker Domain")
 
         # Lambda Layer
         requests_layer = _lambda.LayerVersion(self, "RequestsLayer",
@@ -30,7 +38,7 @@ class WorkshopDeploymentStack(Stack):
 
         # HTTP API Gateway
         api = apigatewayv2.HttpApi(self, "LambdaApi",
-                                   api_name="Lambda API Gateway")
+                                   api_name="Workshop Lambda API Gateway")
 
         # Cognito User Pool
         user_pool = cognito.UserPool(self, "UserPool",
@@ -38,7 +46,7 @@ class WorkshopDeploymentStack(Stack):
                                      sign_in_aliases=cognito.SignInAliases(username=True))
 
         # Generate a unique domain prefix
-        user_pool_domain_prefix = f"myapp-{self.stack_name.lower()}"
+        user_pool_domain_prefix = f"workshop-domain-{self.stack_name.lower()}"
 
         # Cognito User Pool Domain
         user_pool_domain = cognito.UserPoolDomain(self, "UserPoolDomain",
@@ -46,6 +54,7 @@ class WorkshopDeploymentStack(Stack):
                                                   cognito_domain=cognito.CognitoDomainOptions(
                                                       domain_prefix=user_pool_domain_prefix  # Unique domain prefix
                                                   ))
+        user_pool_domain.apply_removal_policy(RemovalPolicy.DESTROY)
 
         # Cognito User Pool Client
         user_pool_client = cognito.UserPoolClient(self, "UserPoolClient",
@@ -70,19 +79,25 @@ class WorkshopDeploymentStack(Stack):
 
         # Role for authenticated users
         authenticated_role = iam.Role(self, "CognitoDefaultAuthenticatedRole",
-                                      assumed_by=iam.FederatedPrincipal("cognito-identity.amazonaws.com",
-                                                                        {
-                                                                            "StringEquals": {
-                                                                                "cognito-identity.amazonaws.com:aud": identity_pool.ref
-                                                                            },
-                                                                            "ForAnyValue:StringLike": {
-                                                                                "cognito-identity.amazonaws.com:amr": "authenticated"
-                                                                            }
-                                                                        },
-                                                                        "sts:AssumeRoleWithWebIdentity"))
+            assumed_by=iam.CompositePrincipal(
+                iam.FederatedPrincipal("cognito-identity.amazonaws.com", {
+                    "StringEquals": {
+                        "cognito-identity.amazonaws.com:aud": identity_pool.ref
+                    },
+                    "ForAnyValue:StringLike": {
+                        "cognito-identity.amazonaws.com:amr": "authenticated"
+                    }
+                }, "sts:AssumeRoleWithWebIdentity"),
+                iam.ServicePrincipal("sagemaker.amazonaws.com")
+            )
+        )
 
         # Attach policies to the role
+        authenticated_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name('AmazonSageMakerFullAccess'))
+
+        # Additional policy for specific SageMaker actions
         authenticated_role.add_to_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
             actions=["sagemaker:CreatePresignedDomainUrl"],
             resources=["*"]
         ))
@@ -92,8 +107,20 @@ class WorkshopDeploymentStack(Stack):
                                               identity_pool_id=identity_pool.ref,
                                               roles={"authenticated": authenticated_role.role_arn})
 
+        # SageMaker Domain
+        sagemaker_domain = sagemaker.CfnDomain(self, "SageMakerWorkshop",
+                                               auth_mode="IAM",
+                                               default_user_settings=sagemaker.CfnDomain.UserSettingsProperty(
+                                                   execution_role=authenticated_role.role_arn,
+                                                   studio_web_portal="ENABLED",
+                                                   default_landing_uri="studio::",
+                                               ),
+                                               domain_name="SageMakerWorkshop",
+                                               subnet_ids=subnet_ids_param.value_as_list,
+                                               vpc_id=vpc_id_param.value_as_string)
+
         # Lambda Function
-        lambda_redirect = _lambda.Function(self, "LambdaRedirect",
+        lambda_redirect = _lambda.Function(self, "LambdaWorkshopRedirect",
                                            runtime=_lambda.Runtime.PYTHON_3_8,
                                            handler="index.lambda_handler",
                                            code=_lambda.Code.from_asset("lambda"),
@@ -104,7 +131,7 @@ class WorkshopDeploymentStack(Stack):
                                                'COGNITO_DOMAIN': f"{user_pool_domain_prefix}.auth.{region_param.value_as_string}.amazoncognito.com",
                                                'IDENTITY_POOL_ID': identity_pool.ref,
                                                'CUSTOM_AWS_REGION': region_param.value_as_string,
-                                               'STUDIO_DOMAIN_ID': 'd-qia0xknhnmu5',  # Update if needed
+                                               'STUDIO_DOMAIN_ID': sagemaker_domain.attr_domain_id,
                                                'USER_POOL_ID': user_pool.user_pool_id,
                                                'REDIRECT_URI': f"{api.url}invoke",
                                            })
@@ -136,6 +163,12 @@ class WorkshopDeploymentStack(Stack):
 
         # Output the Hosted UI URL
         CfnOutput(self, "HostedUIUrl", value=hosted_ui_url)
+
+        # Output the SageMaker Domain ID
+        CfnOutput(self, "SageMakerDomainID", value=sagemaker_domain.attr_domain_id)
+
+        # Output the Cognito User Pool ID
+        CfnOutput(self, "CognitoUserPoolID", value=user_pool.user_pool_id)
 
 
 app = App()
