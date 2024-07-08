@@ -1,19 +1,26 @@
 import subprocess
 import boto3
 import os
-import sys
 import re
+
+VALID_AWS_REGIONS = [
+    'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+    'af-south-1', 'ap-east-1', 'ap-south-1', 'ap-northeast-1',
+    'ap-northeast-2', 'ap-northeast-3', 'ap-southeast-1',
+    'ap-southeast-2', 'ca-central-1', 'cn-north-1', 'cn-northwest-1',
+    'eu-central-1', 'eu-west-1', 'eu-west-2', 'eu-west-3',
+    'eu-north-1', 'eu-south-1', 'me-south-1', 'sa-east-1'
+]
 
 def aws_sign_in():
     print("Please ensure you have AWS CLI configured with 'aws configure'.")
-    # Check if AWS credentials are configured and confirm the AWS account
     try:
         sts_client = boto3.client('sts')
         caller_identity = sts_client.get_caller_identity()
         account_id = caller_identity.get('Account')
         print(f"Signed into AWS account: {account_id}")
         confirmation = input("Is this the correct account? (yes/no): ").strip().lower()
-        if confirmation != 'yes':
+        if confirmation not in ['yes', 'y']:
             print("Please configure the correct AWS account and try again.")
             exit(1)
         print("AWS credentials are configured correctly.")
@@ -25,10 +32,9 @@ def aws_sign_in():
 def set_aws_region():
     while True:
         region = input("Please enter the AWS region to use (e.g., us-west-2): ").strip()
-        if region:
+        if region in VALID_AWS_REGIONS:
             os.environ['AWS_DEFAULT_REGION'] = region
             os.environ['AWS_REGION'] = region
-            # Also configure the AWS CLI with the specified region
             try:
                 subprocess.run(["aws", "configure", "set", "region", region], check=True)
                 print(f"AWS region set to {region}.")
@@ -36,7 +42,7 @@ def set_aws_region():
             except subprocess.CalledProcessError as e:
                 print(f"Error setting AWS region: {e}")
         else:
-            print("Please enter a valid AWS region.")
+            print("Invalid AWS region. Please enter a valid AWS region.")
 
 def get_available_vpcs():
     ec2_client = boto3.client('ec2')
@@ -79,22 +85,17 @@ def gather_parameters(region):
 def deploy_cdk_stack(params):
     print("Deploying the CDK stack...")
 
-    # Set environment variables for CDK context
     os.environ['VPCID'] = params['VPCID']
     os.environ['AWSRegion'] = params['AWSRegion']
     os.environ['SubnetIDs'] = ','.join(params['SubnetIDs'])
 
-    # Format parameters for the CDK deploy command
     cdk_params = f"--parameters AWSRegion={params['AWSRegion']} " \
                  f"--parameters VPCID={params['VPCID']} " \
                  f"--parameters SubnetIDs={','.join(params['SubnetIDs'])}" \
                  " --require-approval never"
 
     try:
-        # Run the CDK deploy command, redirecting stderr to stdout for capture
         result = subprocess.run(f"cdk deploy {cdk_params} 2>&1", shell=True, check=True, capture_output=True, text=True)
-
-        # Print the captured output
         print(result.stdout)
 
         if result.returncode == 0:
@@ -102,24 +103,23 @@ def deploy_cdk_stack(params):
         else:
             print("CDK stack deployment failed.")
         
-        return result.stdout  # Return the stdout of cdk deploy
+        return result.stdout
 
     except subprocess.CalledProcessError as e:
         print(f"CDK deployment error: {e}")
-        print(e.stderr)  # Print stderr if there's an error
+        print(e.stderr)
 
         return None
 
 def extract_outputs(deploy_output):
     cognito_domain_id = None
     sagemaker_id = None
+    hosted_uri = None
 
-    # Use regular expressions to match the desired outputs
     cognito_regex = r"WorkshopDeploymentStack\.CognitoUserPoolID\s+=\s+(.*)"
     sagemaker_regex = r"WorkshopDeploymentStack\.SageMakerDomainID\s+=\s+(.*)"
     hosted_uri_regex = r"WorkshopDeploymentStack\.HostedUIUrl\s+=\s+(.*)"
 
-    # Search for the patterns in the deploy_output
     cognito_match = re.search(cognito_regex, deploy_output)
     sagemaker_match = re.search(sagemaker_regex, deploy_output)
     hosted_uri_match = re.search(hosted_uri_regex, deploy_output)
@@ -148,17 +148,16 @@ def execute_script(script_name, *args):
     except subprocess.CalledProcessError as e:
         print(f"Script execution error: {e}")
 
-
 if __name__ == "__main__":
     aws_sign_in()
     region = set_aws_region()
 
-while True:
-    action = input("Would you like to create or destroy a workshop? (create/destroy): ").strip().lower()
-    if action in ['create', 'destroy']:
-        break  # Exit the loop if input is valid
-    else:
-        print("Invalid action. Please enter 'create' or 'destroy'.")
+    while True:
+        action = input("Would you like to create or destroy a workshop? (create/destroy): ").strip().lower()
+        if action in ['create', 'destroy']:
+            break
+        else:
+            print("Invalid action. Please enter 'create' or 'destroy'.")
 
     if action == 'create':
         parameters = gather_parameters(region)
@@ -168,7 +167,6 @@ while True:
         if deploy_output:
             cognito_domain_id, sagemaker_id, hosted_uri = extract_outputs(deploy_output)
             if cognito_domain_id and sagemaker_id and hosted_uri:
-                # Execute create scripts with extracted IDs
                 execute_script('create_cognito_users.py', num_users, cognito_domain_id, sagemaker_id, hosted_uri, region)
                 print("Created Cognito Users")
                 execute_script('create_sagemaker_profiles.py', region)
@@ -180,10 +178,13 @@ while True:
             print("CDK deployment failed. Exiting.")
 
     if action == 'destroy':
+        print('Deleting spaces...')
         execute_script('delete_spaces.py', region)
         print('Deleted spaces')
+        print('Deleting Sagemaker Users...')
         execute_script('delete_sagemaker_profiles.py', region)
         print('Deleted Sagemaker Users')
+        print('Deleting Cognito Users...')
         execute_script('delete_cognito_users.py', region)
         print('Deleted Cognito Users')
         
