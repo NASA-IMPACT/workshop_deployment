@@ -83,7 +83,7 @@ def gather_parameters(region):
     }
 
 def deploy_cdk_stack(params):
-    print("Deploying the CDK stack...")
+    print("Deploying the CDK stack... Please wait")
 
     os.environ['VPCID'] = params['VPCID']
     os.environ['AWSRegion'] = params['AWSRegion']
@@ -167,8 +167,10 @@ if __name__ == "__main__":
         if deploy_output:
             cognito_domain_id, sagemaker_id, hosted_uri = extract_outputs(deploy_output)
             if cognito_domain_id and sagemaker_id and hosted_uri:
+                print("Creating Cognito Users...")
                 execute_script('create_cognito_users.py', num_users, cognito_domain_id, sagemaker_id, hosted_uri, region)
                 print("Created Cognito Users")
+                print("Creating Sagemaker Profiles...")
                 execute_script('create_sagemaker_profiles.py', region)
                 print("Created Sagemaker Users")
                 print('View users.csv file for sign in information')

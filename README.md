@@ -5,6 +5,7 @@ This tool facilitates the deployment of a Sagemaker workshop with a specified nu
 ## Prerequisites
 - Clone this repository to your local machine.
 - Ensure you have the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed.
+- Ensure that your AWS account has been bootstrapped for CDK. Run `cdk bootstrap`
 
 ## Setting Up a Virtual Environment and Installing Requirements
 
