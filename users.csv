@@ -1,9 +1,9 @@
-Hosted URI,https://workshop-domain-workshopdeploymentstack.auth.us-west-2.amazoncognito.com/login?client_id=106teavfm3m3736qb8i0oihduu&response_type=code&scope=aws.cognito.signin.user.admin+openid+profile&redirect_uri=https://5x14tpm8xk.execute-api.us-west-2.amazonaws.com/invoke
-User Pool ID,us-west-2_0BGewPn6v
-Sagemaker Domain ID,d-408iqid0lo4d
+Hosted URI,https://workshop-domain-4gg64vc1.auth.us-west-2.amazoncognito.com/login?client_id=46pv9j3nd1ghre5k1kvqind53b&response_type=code&scope=aws.cognito.signin.user.admin+openid+profile&redirect_uri=https://9anh05g0ye.execute-api.us-west-2.amazonaws.com/invoke
+User Pool ID,us-west-2_i6mZ3JvRp
+Sagemaker Domain ID,d-kcofs2k9xjgp
 Username,Password
-workshop-001,#2OxN^E1aa.i
-workshop-002,KSiSXqt$j4S+
-workshop-003,"^""CKkm6adzP:"
-workshop-004,V+c8zVSu4roF
-workshop-005,'6aqG&MChQ0m
+workshop-001,R1_WwVSS3=aM
+workshop-002,(n;&Gpc;E3Z<
+workshop-003,C@lUa2?K..wp
+workshop-004,_c/iF{.GH9F<
+workshop-005,"o=&W~k2""u5Hm"

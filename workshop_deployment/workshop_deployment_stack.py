@@ -1,3 +1,5 @@
+import random
+import string
 from aws_cdk import (
     Stack,
     aws_lambda as _lambda,
@@ -45,8 +47,9 @@ class WorkshopDeploymentStack(Stack):
                                      self_sign_up_enabled=False,
                                      sign_in_aliases=cognito.SignInAliases(username=True))
 
-        # Generate a unique domain prefix
-        user_pool_domain_prefix = f"workshop-domain-{self.stack_name.lower()}"
+        # Generate a random string for the domain prefix
+        random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        user_pool_domain_prefix = f"workshop-domain-{random_string}"
 
         # Cognito User Pool Domain
         user_pool_domain = cognito.UserPoolDomain(self, "UserPoolDomain",

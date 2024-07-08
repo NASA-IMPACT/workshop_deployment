@@ -2,6 +2,7 @@ import subprocess
 import boto3
 import os
 import re
+import time
 
 VALID_AWS_REGIONS = [
     'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
@@ -19,8 +20,8 @@ def aws_sign_in():
         caller_identity = sts_client.get_caller_identity()
         account_id = caller_identity.get('Account')
         print(f"Signed into AWS account: {account_id}")
-        confirmation = input("Is this the correct account? (yes/no): ").strip().lower()
-        if confirmation not in ['yes', 'y']:
+        confirmation = input("Is this the correct account? (yes/no) [yes]: ").strip().lower()
+        if confirmation not in ['yes', 'y', '']:
             print("Please configure the correct AWS account and try again.")
             exit(1)
         print("AWS credentials are configured correctly.")
@@ -95,20 +96,26 @@ def deploy_cdk_stack(params):
                  " --require-approval never"
 
     try:
-        result = subprocess.run(f"cdk deploy {cdk_params} 2>&1", shell=True, check=True, capture_output=True, text=True)
-        print(result.stdout)
+        print("Deploying", end="")
+        result = subprocess.Popen(f"cdk deploy {cdk_params} 2>&1", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        while result.poll() is None:
+            print(".", end="", flush=True)
+            time.sleep(1)
+
+        stdout, stderr = result.communicate()
 
         if result.returncode == 0:
-            print("CDK stack deployed successfully.")
+            print("\nCDK stack deployed successfully.")
+            print(stdout)
+            return stdout
         else:
-            print("CDK stack deployment failed.")
-        
-        return result.stdout
-
+            print("\nCDK stack deployment failed.")
+            print(stderr)
+            return None
     except subprocess.CalledProcessError as e:
         print(f"CDK deployment error: {e}")
         print(e.stderr)
-
         return None
 
 def extract_outputs(deploy_output):
@@ -143,8 +150,21 @@ def extract_outputs(deploy_output):
 
 def execute_script(script_name, *args):
     try:
-        result = subprocess.run(["python", script_name, *args], capture_output=True, text=True, check=True)
-        print(result.stdout)
+        print(f"Running {script_name}", end="")
+        result = subprocess.Popen(["python", script_name, *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        while result.poll() is None:
+            print(".", end="", flush=True)
+            time.sleep(1)
+
+        stdout, stderr = result.communicate()
+
+        if result.returncode == 0:
+            print(f"\n{script_name} completed successfully.")
+            print(stdout)
+        else:
+            print(f"\n{script_name} execution failed.")
+            print(stderr)
     except subprocess.CalledProcessError as e:
         print(f"Script execution error: {e}")
 
@@ -153,8 +173,10 @@ if __name__ == "__main__":
     region = set_aws_region()
 
     while True:
-        action = input("Would you like to create or destroy a workshop? (create/destroy): ").strip().lower()
-        if action in ['create', 'destroy']:
+        action = input("Would you like to create or destroy a workshop? (create/destroy) [create]: ").strip().lower()
+        if action in ['create', 'destroy', '']:
+            if action == '':
+                action = 'create'
             break
         else:
             print("Invalid action. Please enter 'create' or 'destroy'.")
@@ -180,13 +202,10 @@ if __name__ == "__main__":
             print("CDK deployment failed. Exiting.")
 
     if action == 'destroy':
-        print('Deleting spaces...')
         execute_script('delete_spaces.py', region)
         print('Deleted spaces')
-        print('Deleting Sagemaker Users...')
         execute_script('delete_sagemaker_profiles.py', region)
         print('Deleted Sagemaker Users')
-        print('Deleting Cognito Users...')
         execute_script('delete_cognito_users.py', region)
         print('Deleted Cognito Users')
         
