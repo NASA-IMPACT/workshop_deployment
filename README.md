@@ -3,7 +3,8 @@
 This tool facilitates the deployment of a Sagemaker workshop with a specified number of users.
 
 ## Prerequisites
-- Ensure the AWS CLI is installed on your local machine.
+- Clone this repository to your local machine.
+- Ensure you have the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed.
 
 ## Setting Up a Virtual Environment and Installing Requirements
 
