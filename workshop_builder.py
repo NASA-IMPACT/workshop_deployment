@@ -203,11 +203,8 @@ if __name__ == "__main__":
 
     if action == 'destroy':
         execute_script('delete_spaces.py', region)
-        print('Deleted spaces')
         execute_script('delete_sagemaker_profiles.py', region)
-        print('Deleted Sagemaker Users')
         execute_script('delete_cognito_users.py', region)
-        print('Deleted Cognito Users')
         
         try:
             subprocess.run(["cdk", "destroy", "--force"], check=True, capture_output=True, text=True)
