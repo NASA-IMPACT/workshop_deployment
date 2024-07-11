@@ -207,7 +207,21 @@ if __name__ == "__main__":
         execute_script('delete_cognito_users.py', region)
         
         try:
-            subprocess.run(["cdk", "destroy", "--force"], check=True, capture_output=True, text=True)
-            print('Fully deleted workshop')
+            print("Destroying", end="")
+            result = subprocess.run(["cdk", "destroy", "--force"], check=True, capture_output=True, text=True)
+
+            while result.poll() is None:
+                print(".", end="", flush=True)
+                time.sleep(1)
+
+            stdout, stderr = result.communicate()
+
+            if result.returncode == 0:
+                print("\nCDK stack destroyed successfully.")
+                print(stdout)
+            else:
+                print("\nCDK stack deployment failed.")
+                print(stderr)
+    
         except subprocess.CalledProcessError as e:
             print(f"Error destroying CDK stack: {e}")
