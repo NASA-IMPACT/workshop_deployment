@@ -95,8 +95,8 @@ def deploy_cdk_stack(params, workshop_name):
     cdk_params = f"--parameters AWSRegion={params['AWSRegion']} " \
                  f"--parameters VPCID={params['VPCID']} " \
                  f"--parameters SubnetIDs={','.join(params['SubnetIDs'])} " \
-                 f"--parameters WorkshopName={workshop_name} " \
-                 "--require-approval never"
+                 f"--context workshop_name={workshop_name} " \
+                 f"--require-approval never"
 
     try:
         print("Deploying", end="")
@@ -120,6 +120,26 @@ def deploy_cdk_stack(params, workshop_name):
         print(f"CDK deployment error: {e}")
         print(e.stderr)
         return None
+
+def destroy_cdk_stack(stack_name, workshop_name):
+    try:
+        print(f"Destroying stack {stack_name}", end="")
+        result = subprocess.Popen([f"cdk destroy {stack_name}-WorkshopDeploymentStack --context workshop_name={workshop_name} --force"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        while result.poll() is None:
+            print(".", end="", flush=True)
+            time.sleep(1)
+
+        if result.returncode == 0:
+            print(f"\nCDK stack {stack_name} destroyed successfully.")
+            print(result.stdout)
+        else:
+            print(f"\nCDK stack {stack_name} destroy failed.")
+            print(result.stderr)
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error destroying CDK stack {stack_name}: {e}")
+
 
 def extract_outputs(deploy_output):
     cognito_domain_id = None
@@ -184,6 +204,10 @@ def select_csv_file():
     file_index = int(input("Choose a CSV file (enter number): ")) - 1
     return csv_files[file_index]
 
+def extract_stack_name_from_csv(csv_file):
+    stack_name = csv_file.split('-users.csv')[0]
+    return stack_name
+
 if __name__ == "__main__":
     aws_sign_in()
     region = set_aws_region()
@@ -216,29 +240,22 @@ if __name__ == "__main__":
         else:
             print("CDK deployment failed. Exiting.")
 
-    if action == 'destroy':
-        csv_file = select_csv_file()
-        if csv_file:
-            print('Deleting spaces...')
-            execute_script('delete_spaces.py', csv_file, region)
-            print('Deleting Sagemaker Users...')
-            execute_script('delete_sagemaker_profiles.py', csv_file, region)
-            print('Deleting Cognito Users...')
-            execute_script('delete_cognito_users.py', csv_file, region)
-            
-        try:
-            print("Destroying", end="")
-            result = subprocess.run(["cdk", "destroy", "--force"], check=True, capture_output=True, text=True)
+if action == 'destroy':
+    csv_file = select_csv_file()
+    if csv_file:
+        print('Deleting spaces...')
+        execute_script('delete_spaces.py', csv_file, region)
+        print('Deleting Sagemaker Users...')
+        execute_script('delete_sagemaker_profiles.py', csv_file, region)
+        print('Deleting Cognito Users...')
+        execute_script('delete_cognito_users.py', csv_file, region)
 
-            if result.returncode == 0:
-                print("\nCDK stack destroyed successfully.")
-                print(result.stdout)
-            else:
-                print("\nCDK stack destroy failed.")
-                print(result.stderr)
-    
-        except subprocess.CalledProcessError as e:
-            print(f"Error destroying CDK stack: {e}")
+        stack_name = extract_stack_name_from_csv(csv_file)
+        
+        # Extract workshop name from the stack name
+        workshop_name = stack_name.split('-')[0]
+        
+        destroy_cdk_stack(stack_name, workshop_name)
 
         try:
             os.remove(csv_file)

@@ -7,7 +7,13 @@ from workshop_deployment.workshop_deployment_stack import WorkshopDeploymentStac
 
 
 app = cdk.App()
-stack = WorkshopDeploymentStack(app, "WorkshopDeploymentStack")
+
+workshop_name = app.node.try_get_context("workshop_name")
+if not workshop_name:
+    print("Error: workshop_name context parameter is required")
+    exit(1)
+
+stack = WorkshopDeploymentStack(app, f"{workshop_name}-WorkshopDeploymentStack", workshop_name=workshop_name)
 cdk.Tags.of(stack).add("project", "Workshop")
 
 app.synth()
