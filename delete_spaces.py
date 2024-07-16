@@ -11,8 +11,6 @@ import sys
 WAIT_TIME = 5  # Time in seconds to wait between checks
 MAX_WAIT_ITERATIONS = 60  # Maximum number of iterations to wait
 
-CSV_FILE = "cmtworkshop-users.csv"  # Define your CSV file name here
-
 def list_spaces(domain_id, region):
     command = ["aws", "sagemaker", "list-spaces", "--domain-id", domain_id, "--region", region]
     try:
@@ -108,11 +106,11 @@ def get_domain_id_from_csv(csv_file):
         logging.error(f"Failed to process CSV file: {e}")
         return None
 
-def main(region):
+def main(csv_file, region):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Fetch domain ID from CSV
-    domain_id = get_domain_id_from_csv(CSV_FILE)
+    domain_id = get_domain_id_from_csv(csv_file)
     if not domain_id:
         logging.error("Failed to fetch Sagemaker Domain ID from CSV. Exiting.")
         sys.exit(1)
@@ -134,9 +132,10 @@ def main(region):
         delete_space(domain_id, space_name, region)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <aws-region>")
+    if len(sys.argv) < 3:
+        print("Usage: python script.py <csvs_file> <aws-region>")
         sys.exit(1)
     
-    aws_region = sys.argv[1]
-    main(aws_region)
+    csv_file = sys.argv[1]
+    aws_region = sys.argv[2]
+    main(csv_file, aws_region)

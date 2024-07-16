@@ -3,9 +3,6 @@ import csv
 import logging
 import sys
 
-# Constants
-CSV_FILE = "cmtworkshop-users.csv"  # Replace with your CSV file name
-
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -23,12 +20,12 @@ def delete_user_profile(sm_client, domain_id, username):
         logging.error(f"Failed to delete user profile '{username}': {e}")
         return None
 
-def main(region):
+def main(csv_file, region):
     session = boto3.Session(region_name=region)
     sm_client = session.client('sagemaker')
     
     try:
-        with open(CSV_FILE, mode='r') as file:
+        with open(csv_file, mode='r') as file:
             reader = csv.reader(file)
             rows = list(reader)
 
@@ -49,14 +46,15 @@ def main(region):
                     username = row[0]
                     delete_user_profile(sm_client, sagemaker_domain_id, username)
     except FileNotFoundError:
-        logging.error(f"CSV file '{CSV_FILE}' not found.")
+        logging.error(f"CSV file '{csv_file}' not found.")
     except Exception as e:
         logging.error(f"Failed to process CSV file: {e}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <aws-region>")
+    if len(sys.argv) < 3:
+        print("Usage: python script.py <csv_file> <aws-region>")
         sys.exit(1)
     
-    aws_region = sys.argv[1]
-    main(aws_region)
+    csv_file = sys.argv[1]
+    aws_region = sys.argv[2]
+    main(csv_file, aws_region)

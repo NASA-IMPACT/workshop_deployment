@@ -3,6 +3,7 @@ import boto3
 import os
 import re
 import time
+import glob
 
 VALID_AWS_REGIONS = [
     'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
@@ -170,6 +171,19 @@ def execute_script(script_name, *args):
     except subprocess.CalledProcessError as e:
         print(f"Script execution error: {e}")
 
+def select_csv_file():
+    csv_files = glob.glob("*-users.csv")
+    if not csv_files:
+        print("No CSV files ending in '-users.csv' found.")
+        return None
+
+    print("Available CSV files:")
+    for index, file in enumerate(csv_files, start=1):
+        print(f"{index}. {file}")
+    
+    file_index = int(input("Choose a CSV file (enter number): ")) - 1
+    return csv_files[file_index]
+
 if __name__ == "__main__":
     aws_sign_in()
     region = set_aws_region()
@@ -203,26 +217,31 @@ if __name__ == "__main__":
             print("CDK deployment failed. Exiting.")
 
     if action == 'destroy':
-        execute_script('delete_spaces.py', region)
-        execute_script('delete_sagemaker_profiles.py', region)
-        execute_script('delete_cognito_users.py', region)
-        
+        csv_file = select_csv_file()
+        if csv_file:
+            print('Deleting spaces...')
+            execute_script('delete_spaces.py', csv_file, region)
+            print('Deleting Sagemaker Users...')
+            execute_script('delete_sagemaker_profiles.py', csv_file, region)
+            print('Deleting Cognito Users...')
+            execute_script('delete_cognito_users.py', csv_file, region)
+            
         try:
             print("Destroying", end="")
             result = subprocess.run(["cdk", "destroy", "--force"], check=True, capture_output=True, text=True)
 
-            while result.poll() is None:
-                print(".", end="", flush=True)
-                time.sleep(1)
-
-            stdout, stderr = result.communicate()
-
             if result.returncode == 0:
                 print("\nCDK stack destroyed successfully.")
-                print(stdout)
+                print(result.stdout)
             else:
-                print("\nCDK stack deployment failed.")
-                print(stderr)
+                print("\nCDK stack destroy failed.")
+                print(result.stderr)
     
         except subprocess.CalledProcessError as e:
             print(f"Error destroying CDK stack: {e}")
+
+        try:
+            os.remove(csv_file)
+            print(f"Deleted the file: {csv_file}")
+        except Exception as e:
+            print(f"Failed to delete the file {csv_file}: {e}")

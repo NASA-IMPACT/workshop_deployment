@@ -3,9 +3,6 @@ import csv
 import logging
 import sys
 
-# CSV file and AWS Configuration
-CSV_FILE = "cmtworkshop-users.csv"
-
 def delete_cognito_user(user_pool_id, username, region):
     client = boto3.client('cognito-idp', region_name=region)
 
@@ -20,9 +17,9 @@ def delete_cognito_user(user_pool_id, username, region):
     except Exception as e:
         logging.error(f"Failed to delete user {username}: {str(e)}")
 
-def main(region):
+def main(csv_file, region):
     try:
-        with open(CSV_FILE, mode='r') as file:
+        with open(csv_file, mode='r') as file:
             reader = csv.reader(file)
             rows = list(reader)
 
@@ -43,17 +40,18 @@ def main(region):
                     username = row[0]
                     delete_cognito_user(user_pool_id, username, region)
     except FileNotFoundError:
-        logging.error(f"CSV file '{CSV_FILE}' not found.")
+        logging.error(f"CSV file '{csv_file}' not found.")
     except Exception as e:
         logging.error(f"Failed to process CSV file: {str(e)}")
 
     logging.info("User deletion process complete.")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <aws-region>")
+    if len(sys.argv) < 3:
+        print("Usage: python script.py <csv_file> <aws-region>")
         sys.exit(1)
     
-    aws_region = sys.argv[1]
+    csv_file = sys.argv[1]
+    aws_region = sys.argv[2]
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    main(aws_region)
+    main(csv_file, aws_region)
