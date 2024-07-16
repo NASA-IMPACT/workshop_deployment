@@ -4,7 +4,7 @@ import logging
 import sys
 
 # Constants
-CSV_FILE = "users.csv"  # Replace with your CSV file name
+CSV_FILE = "cmtworkshop-users.csv"  # Replace with your CSV file name
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

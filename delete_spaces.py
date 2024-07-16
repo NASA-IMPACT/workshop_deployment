@@ -11,7 +11,7 @@ import sys
 WAIT_TIME = 5  # Time in seconds to wait between checks
 MAX_WAIT_ITERATIONS = 60  # Maximum number of iterations to wait
 
-CSV_FILE = "users.csv"  # Define your CSV file name here
+CSV_FILE = "cmtworkshop-users.csv"  # Define your CSV file name here
 
 def list_spaces(domain_id, region):
     command = ["aws", "sagemaker", "list-spaces", "--domain-id", domain_id, "--region", region]

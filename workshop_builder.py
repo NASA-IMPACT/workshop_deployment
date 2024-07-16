@@ -83,17 +83,19 @@ def gather_parameters(region):
         "SubnetIDs": subnet_ids
     }
 
-def deploy_cdk_stack(params):
+def deploy_cdk_stack(params, workshop_name):
     print("Deploying the CDK stack... Please wait")
 
     os.environ['VPCID'] = params['VPCID']
     os.environ['AWSRegion'] = params['AWSRegion']
     os.environ['SubnetIDs'] = ','.join(params['SubnetIDs'])
+    os.environ['WORKSHOP_NAME'] = workshop_name
 
     cdk_params = f"--parameters AWSRegion={params['AWSRegion']} " \
                  f"--parameters VPCID={params['VPCID']} " \
-                 f"--parameters SubnetIDs={','.join(params['SubnetIDs'])}" \
-                 " --require-approval never"
+                 f"--parameters SubnetIDs={','.join(params['SubnetIDs'])} " \
+                 f"--parameters WorkshopName={workshop_name} " \
+                 "--require-approval never"
 
     try:
         print("Deploying", end="")
@@ -184,18 +186,17 @@ if __name__ == "__main__":
     if action == 'create':
         parameters = gather_parameters(region)
         num_users = input("Enter the number of users to create: ").strip()
-        deploy_output = deploy_cdk_stack(parameters)
+        workshop_name = input("Please enter the workshop name: ").strip()
+        deploy_output = deploy_cdk_stack(parameters, workshop_name)
 
         if deploy_output:
             cognito_domain_id, sagemaker_id, hosted_uri = extract_outputs(deploy_output)
             if cognito_domain_id and sagemaker_id and hosted_uri:
-                print("Creating Cognito Users...")
-                execute_script('create_cognito_users.py', num_users, cognito_domain_id, sagemaker_id, hosted_uri, region)
-                print("Created Cognito Users")
+                print("Creating Cognito users...")
+                execute_script('create_cognito_users.py', num_users, cognito_domain_id, sagemaker_id, hosted_uri, region, workshop_name)
                 print("Creating Sagemaker Profiles...")
-                execute_script('create_sagemaker_profiles.py', region)
-                print("Created Sagemaker Users")
-                print('View users.csv file for sign in information')
+                execute_script('create_sagemaker_profiles.py', region, workshop_name)
+                print(f'View {workshop_name}-users.csv file for sign in information')
             else:
                 print("Failed to extract Cognito Domain ID and/or SageMaker ID from the CDK deploy output.")
         else:

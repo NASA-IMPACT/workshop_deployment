@@ -4,7 +4,7 @@ import logging
 import sys
 
 # CSV file and AWS Configuration
-CSV_FILE = "users.csv"
+CSV_FILE = "cmtworkshop-users.csv"
 
 def delete_cognito_user(user_pool_id, username, region):
     client = boto3.client('cognito-idp', region_name=region)

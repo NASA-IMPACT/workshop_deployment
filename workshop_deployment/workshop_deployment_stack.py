@@ -31,6 +31,9 @@ class WorkshopDeploymentStack(Stack):
         subnet_ids_param = CfnParameter(self, "SubnetIDs",
                                         type="List<String>",
                                         description="The Subnet IDs for the SageMaker Domain")
+        workshop_name = CfnParameter(self, "WorkshopName",
+                                     type="String",
+                                     description="The name of the SageMaker Domain")
 
         # Lambda Layer
         requests_layer = _lambda.LayerVersion(self, "RequestsLayer",
@@ -118,7 +121,7 @@ class WorkshopDeploymentStack(Stack):
                                                    studio_web_portal="ENABLED",
                                                    default_landing_uri="studio::",
                                                ),
-                                               domain_name="SageMakerWorkshop",
+                                               domain_name=workshop_name.value_as_string,
                                                subnet_ids=subnet_ids_param.value_as_list,
                                                vpc_id=vpc_id_param.value_as_string)
 

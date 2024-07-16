@@ -5,9 +5,6 @@ import string
 import logging
 import sys
 
-# Constants
-CSV_FILE = "users.csv"
-
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -50,11 +47,11 @@ def create_cognito_user(client, username, temporary_password, user_pool_id):
 
     return response
 
-def main(num_users, user_pool_id, sagemaker_domain_id, hosted_uri, region):
+def main(num_users, user_pool_id, sagemaker_domain_id, hosted_uri, region, workshop_name):
     client = boto3.client('cognito-idp', region_name=region)
 
     # Write user pool id, sagemaker domain id, and hosted URI at the top of CSV
-    with open(CSV_FILE, mode='w', newline='') as file:
+    with open(f"{workshop_name}-users.csv", mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Hosted URI", hosted_uri])
         writer.writerow(["User Pool ID", user_pool_id])
@@ -70,11 +67,11 @@ def main(num_users, user_pool_id, sagemaker_domain_id, hosted_uri, region):
             if response:
                 writer.writerow([username, temporary_password])
 
-    logging.info(f"Users created and details saved to {CSV_FILE}")
+    logging.info(f"Users created and details saved to {workshop_name}-users.csv")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 6:
-        print("Usage: python script_name.py <num_users> <user_pool_id> <sagemaker_domain_id> <hosted_uri> <region>")
+    if len(sys.argv) != 7:
+        print("Usage: python create_cognito_users.py <num_users> <user_pool_id> <sagemaker_domain_id> <hosted_uri> <region> <workshop_name>")
         sys.exit(1)
     
     num_users = int(sys.argv[1])
@@ -82,5 +79,6 @@ if __name__ == "__main__":
     sagemaker_domain_id = sys.argv[3]
     hosted_uri = sys.argv[4]
     region = sys.argv[5]
+    workshop_name = sys.argv[6]
 
-    main(num_users, user_pool_id, sagemaker_domain_id, hosted_uri, region)
+    main(num_users, user_pool_id, sagemaker_domain_id, hosted_uri, region, workshop_name)
