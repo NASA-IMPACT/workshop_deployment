@@ -4,6 +4,7 @@ import os
 import re
 import time
 import glob
+import pandas as pd
 
 VALID_AWS_REGIONS = [
     'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
@@ -33,7 +34,7 @@ def aws_sign_in():
 
 def set_aws_region():
     while True:
-        region = input("Please enter the AWS region to use (e.g., us-west-2): ").strip()
+        region = input("Please enter the AWS region to use (e.g. us-west-2): ").strip()
         if region in VALID_AWS_REGIONS:
             os.environ['AWS_DEFAULT_REGION'] = region
             os.environ['AWS_REGION'] = region
@@ -191,18 +192,31 @@ def execute_script(script_name, *args):
     except subprocess.CalledProcessError as e:
         print(f"Script execution error: {e}")
 
-def select_csv_file():
+def select_csv_file(region):
     csv_files = glob.glob("*-users.csv")
     if not csv_files:
         print("No CSV files ending in '-users.csv' found.")
         return None
 
+    valid_files = []
+    for file in csv_files:
+        try:
+            df = pd.read_csv(file)
+            if df.apply(lambda row: row.astype(str).str.contains(region, na=False).any(), axis=1).any():
+                valid_files.append(file)
+        except Exception as e:
+            print(f"Error reading {file}: {e}")
+
+    if not valid_files:
+        print(f"No existing workshops found in the '{region}' region.")
+        return None
+
     print("Available CSV files:")
-    for index, file in enumerate(csv_files, start=1):
+    for index, file in enumerate(valid_files, start=1):
         print(f"{index}. {file}")
     
     file_index = int(input("Choose a CSV file (enter number): ")) - 1
-    return csv_files[file_index]
+    return valid_files[file_index]
 
 def extract_stack_name_from_csv(csv_file):
     stack_name = csv_file.split('-users.csv')[0]
@@ -241,7 +255,7 @@ if __name__ == "__main__":
             print("CDK deployment failed. Exiting.")
 
 if action == 'destroy':
-    csv_file = select_csv_file()
+    csv_file = select_csv_file(region)
     if csv_file:
         print('Deleting spaces...')
         execute_script('delete_spaces.py', csv_file, region)
