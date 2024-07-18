@@ -133,7 +133,6 @@ def destroy_cdk_stack(stack_name, workshop_name):
 
         if result.returncode == 0:
             print(f"\nCDK stack {stack_name} destroyed successfully.")
-            print(result.stdout)
         else:
             print(f"\nCDK stack {stack_name} destroy failed.")
             print(result.stderr)
@@ -195,7 +194,7 @@ def execute_script(script_name, *args):
 def select_csv_file(region):
     csv_files = glob.glob("*-users.csv")
     if not csv_files:
-        print("No CSV files ending in '-users.csv' found.")
+        print("No existing workshops found.")
         return None
 
     valid_files = []
@@ -211,7 +210,7 @@ def select_csv_file(region):
         print(f"No existing workshops found in the '{region}' region.")
         return None
 
-    print("Available CSV files:")
+    print("Workshops available to delete:")
     for index, file in enumerate(valid_files, start=1):
         print(f"{index}. {file}")
     
