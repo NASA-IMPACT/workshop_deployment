@@ -5,6 +5,7 @@ import re
 import time
 import glob
 import pandas as pd
+import csv
 
 VALID_AWS_REGIONS = [
     'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
@@ -221,6 +222,15 @@ def extract_stack_name_from_csv(csv_file):
     stack_name = csv_file.split('-users.csv')[0]
     return stack_name
 
+def count_csv_rows(csv_file):
+    """
+    Count the number of rows in a CSV file.
+    """
+    with open(csv_file, 'r') as file:
+        reader = csv.reader(file)
+        num_rows = sum(1 for row in reader)
+    return num_rows
+
 if __name__ == "__main__":
     aws_sign_in()
     region = set_aws_region()
@@ -247,6 +257,8 @@ if __name__ == "__main__":
                 execute_script('create_cognito_users.py', num_users, cognito_domain_id, sagemaker_id, hosted_uri, region, workshop_name)
                 print("Creating Sagemaker Profiles...")
                 execute_script('create_sagemaker_profiles.py', region, workshop_name)
+                print("Creating S3 buckets...")
+                execute_script('create_s3_buckets.py', region, workshop_name, num_users)
                 print(f'View {workshop_name}-users.csv file for sign in information')
             else:
                 print("Failed to extract Cognito Domain ID and/or SageMaker ID from the CDK deploy output.")
@@ -255,13 +267,18 @@ if __name__ == "__main__":
 
 if action == 'destroy':
     csv_file = select_csv_file(region)
+    workshop_name = extract_stack_name_from_csv(csv_file)
+    num_rows = count_csv_rows(csv_file)
+    num_users = num_rows - 4  # Adjust num_users as specified
     if csv_file:
         print('Deleting spaces...')
         execute_script('delete_spaces.py', csv_file, region)
-        print('Deleting Sagemaker Users...')
+        print('Deleting Sagemaker users...')
         execute_script('delete_sagemaker_profiles.py', csv_file, region)
-        print('Deleting Cognito Users...')
+        print('Deleting Cognito users...')
         execute_script('delete_cognito_users.py', csv_file, region)
+        print('Deleting S3 buckets...')
+        execute_script('delete_s3_buckets.py', region, workshop_name, str(num_users))
 
         stack_name = extract_stack_name_from_csv(csv_file)
         
