@@ -6,6 +6,8 @@ import time
 import glob
 import pandas as pd
 import csv
+from tqdm import tqdm
+import sys
 
 VALID_AWS_REGIONS = [
     'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
@@ -17,6 +19,7 @@ VALID_AWS_REGIONS = [
 ]
 
 def aws_sign_in():
+    """Verify AWS CLI configuration and account."""
     print("Please ensure you have AWS CLI configured with 'aws configure'.")
     try:
         sts_client = boto3.client('sts')
@@ -34,33 +37,51 @@ def aws_sign_in():
         exit(1)
 
 def set_aws_region():
+    """Query the current AWS region and ask if the user wants to change it."""
+    # Get the current region
+    session = boto3.Session()
+    current_region = session.region_name
+
+    if current_region:
+        print(f"Current AWS region: {current_region}")
+        change_region = input("Would you like to change the region? (yes/no) [no]: ").strip().lower()
+        if change_region not in ['yes', 'y']:
+            return current_region
+    else:
+        print("No AWS region currently set.")
+        change_region = 'yes'
+
     while True:
-        region = input("Please enter the AWS region to use (e.g. us-west-2): ").strip()
-        if region in VALID_AWS_REGIONS:
-            os.environ['AWS_DEFAULT_REGION'] = region
-            os.environ['AWS_REGION'] = region
-            try:
-                subprocess.run(["aws", "configure", "set", "region", region], check=True)
-                print(f"AWS region set to {region}.")
-                return region
-            except subprocess.CalledProcessError as e:
-                print(f"Error setting AWS region: {e}")
+        if change_region in ['yes', 'y']:
+            new_region = input("Please enter the AWS region to use (e.g. us-west-2): ").strip()
+            if new_region in VALID_AWS_REGIONS:
+                os.environ['AWS_DEFAULT_REGION'] = new_region
+                os.environ['AWS_REGION'] = new_region
+                try:
+                    subprocess.run(["aws", "configure", "set", "region", new_region], check=True)
+                    print(f"AWS region set to {new_region}.")
+                    return new_region
+                except subprocess.CalledProcessError as e:
+                    print(f"Error setting AWS region: {e}")
+            else:
+                print("Invalid AWS region. Please enter a valid AWS region.")
         else:
-            print("Invalid AWS region. Please enter a valid AWS region.")
+            return current_region
 
 def get_available_vpcs():
+    """Retrieve available VPCs in the selected region."""
     ec2_client = boto3.client('ec2')
     response = ec2_client.describe_vpcs()
-    vpcs = response['Vpcs']
-    return vpcs
+    return response['Vpcs']
 
 def get_available_subnets(vpc_id):
+    """Retrieve available subnets for a given VPC."""
     ec2_client = boto3.client('ec2')
     response = ec2_client.describe_subnets(Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])
-    subnets = response['Subnets']
-    return subnets
+    return response['Subnets']
 
 def select_vpc():
+    """Allow user to select a VPC from available options."""
     vpcs = get_available_vpcs()
     print("Available VPCs:")
     for index, vpc in enumerate(vpcs, start=1):
@@ -70,6 +91,7 @@ def select_vpc():
     return vpcs[vpc_index]['VpcId']
 
 def gather_parameters(region):
+    """Collect necessary parameters for deployment."""
     vpc_id = select_vpc()
     
     subnets = get_available_subnets(vpc_id)
@@ -89,6 +111,7 @@ def gather_parameters(region):
 def deploy_cdk_stack(params, workshop_name):
     print("Deploying the CDK stack... Please wait")
 
+    # Set environment variables for CDK deployment
     os.environ['VPCID'] = params['VPCID']
     os.environ['AWSRegion'] = params['AWSRegion']
     os.environ['SubnetIDs'] = ','.join(params['SubnetIDs'])
@@ -100,49 +123,53 @@ def deploy_cdk_stack(params, workshop_name):
                  f"--context workshop_name={workshop_name} " \
                  f"--require-approval never"
 
+    command = f"cdk deploy {cdk_params}"
+
     try:
-        print("Deploying", end="")
-        result = subprocess.Popen(f"cdk deploy {cdk_params} 2>&1", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
-        while result.poll() is None:
-            print(".", end="", flush=True)
-            time.sleep(1)
+        output = []
+        for line in iter(process.stdout.readline, ''):
+            print(line, end='')
+            sys.stdout.flush()
+            output.append(line)
 
-        stdout, stderr = result.communicate()
+        process.stdout.close()
+        return_code = process.wait()
 
-        if result.returncode == 0:
+        if return_code == 0:
             print("\nCDK stack deployed successfully.")
-            print(stdout)
-            return stdout
+            return ''.join(output)
         else:
             print("\nCDK stack deployment failed.")
-            print(stderr)
             return None
     except subprocess.CalledProcessError as e:
         print(f"CDK deployment error: {e}")
-        print(e.stderr)
         return None
 
 def destroy_cdk_stack(stack_name, workshop_name):
     try:
-        print(f"Destroying stack {stack_name}", end="")
-        result = subprocess.Popen([f"cdk destroy {stack_name}-WorkshopDeploymentStack --context workshop_name={workshop_name} --force"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        command = f"cdk destroy {stack_name}-WorkshopDeploymentStack --context workshop_name={workshop_name} --force"
+        
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
-        while result.poll() is None:
-            print(".", end="", flush=True)
-            time.sleep(1)
+        for line in iter(process.stdout.readline, ''):
+            print(line, end='')
+            sys.stdout.flush()
 
-        if result.returncode == 0:
+        process.stdout.close()
+        return_code = process.wait()
+
+        if return_code == 0:
             print(f"\nCDK stack {stack_name} destroyed successfully.")
         else:
             print(f"\nCDK stack {stack_name} destroy failed.")
-            print(result.stderr)
 
     except subprocess.CalledProcessError as e:
         print(f"Error destroying CDK stack {stack_name}: {e}")
 
-
 def extract_outputs(deploy_output):
+    """Extract important outputs from CDK deployment."""
     cognito_domain_id = None
     sagemaker_id = None
     hosted_uri = None
@@ -174,12 +201,15 @@ def extract_outputs(deploy_output):
 
 def execute_script(script_name, *args):
     try:
-        print(f"Running {script_name}", end="")
-        result = subprocess.Popen(["python", script_name, *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # Convert all args to strings to avoid TypeError
+        str_args = [str(arg) for arg in args]
+        
+        with tqdm(total=0, desc=f"Running {script_name}", bar_format='{desc}: {elapsed}') as pbar:
+            result = subprocess.Popen(["python", script_name, *str_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-        while result.poll() is None:
-            print(".", end="", flush=True)
-            time.sleep(1)
+            while result.poll() is None:
+                pbar.update(1)
+                time.sleep(1)
 
         stdout, stderr = result.communicate()
 
@@ -193,6 +223,7 @@ def execute_script(script_name, *args):
         print(f"Script execution error: {e}")
 
 def select_csv_file(region):
+    """Select a CSV file for an existing workshop in the given region."""
     csv_files = glob.glob("*-users.csv")
     if not csv_files:
         print("No existing workshops found.")
@@ -219,17 +250,31 @@ def select_csv_file(region):
     return valid_files[file_index]
 
 def extract_stack_name_from_csv(csv_file):
+    """Extract the stack name from the CSV file name."""
     stack_name = csv_file.split('-users.csv')[0]
     return stack_name
 
 def count_csv_rows(csv_file):
-    """
-    Count the number of rows in a CSV file.
-    """
+    """Count the number of rows in a CSV file."""
     with open(csv_file, 'r') as file:
         reader = csv.reader(file)
         num_rows = sum(1 for row in reader)
     return num_rows
+
+def get_existing_workshop_names():
+    """Get a list of existing workshop names from CSV files."""
+    csv_files = glob.glob("*-users.csv")
+    return [os.path.splitext(file)[0].replace('-users', '') for file in csv_files]
+
+def get_unique_workshop_name():
+    """Prompt for a unique workshop name that doesn't exist in current CSV files."""
+    existing_names = get_existing_workshop_names()
+    while True:
+        workshop_name = input("Please enter the workshop name: ").strip()
+        if workshop_name in existing_names:
+            print(f"A workshop named '{workshop_name}' already exists. Please choose a different name.")
+        else:
+            return workshop_name
 
 if __name__ == "__main__":
     aws_sign_in()
@@ -247,7 +292,7 @@ if __name__ == "__main__":
     if action == 'create':
         parameters = gather_parameters(region)
         num_users = input("Enter the number of users to create: ").strip()
-        workshop_name = input("Please enter the workshop name: ").strip()
+        workshop_name = get_unique_workshop_name()
         deploy_output = deploy_cdk_stack(parameters, workshop_name)
 
         if deploy_output:
@@ -265,30 +310,31 @@ if __name__ == "__main__":
         else:
             print("CDK deployment failed. Exiting.")
 
-if action == 'destroy':
-    csv_file = select_csv_file(region)
-    workshop_name = extract_stack_name_from_csv(csv_file)
-    num_rows = count_csv_rows(csv_file)
-    num_users = num_rows - 4  # Adjust num_users as specified
-    if csv_file:
-        print('Deleting spaces...')
-        execute_script('delete_spaces.py', csv_file, region)
-        print('Deleting Sagemaker users...')
-        execute_script('delete_sagemaker_profiles.py', csv_file, region)
-        print('Deleting Cognito users...')
-        execute_script('delete_cognito_users.py', csv_file, region)
-        print('Deleting S3 buckets...')
-        execute_script('delete_s3_buckets.py', region, workshop_name, str(num_users))
+    if action == 'destroy':
+        csv_file = select_csv_file(region)
+        if csv_file:
+            workshop_name = extract_stack_name_from_csv(csv_file)
+            num_rows = count_csv_rows(csv_file)
+            num_users = num_rows - 4  # Adjust num_users as specified
 
-        stack_name = extract_stack_name_from_csv(csv_file)
-        
-        # Extract workshop name from the stack name
-        workshop_name = stack_name.split('-')[0]
-        
-        destroy_cdk_stack(stack_name, workshop_name)
+            print('Deleting spaces...')
+            execute_script('delete_spaces.py', csv_file, region)
+            print('Deleting Sagemaker users...')
+            execute_script('delete_sagemaker_profiles.py', csv_file, region)
+            print('Deleting Cognito users...')
+            execute_script('delete_cognito_users.py', csv_file, region)
+            print('Deleting S3 buckets...')
+            execute_script('delete_s3_buckets.py', region, workshop_name, num_users)
 
-        try:
-            os.remove(csv_file)
-            print(f"Deleted the file: {csv_file}")
-        except Exception as e:
-            print(f"Failed to delete the file {csv_file}: {e}")
+            stack_name = extract_stack_name_from_csv(csv_file)
+            
+            # Extract workshop name from the stack name
+            workshop_name = stack_name.split('-')[0]
+            
+            destroy_cdk_stack(stack_name, workshop_name)
+
+            try:
+                os.remove(csv_file)
+                print(f"Deleted the file: {csv_file}")
+            except Exception as e:
+                print(f"Failed to delete the file {csv_file}: {e}")

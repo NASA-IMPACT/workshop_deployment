@@ -46,6 +46,7 @@ class WorkshopDeploymentStack(Stack):
         user_pool = cognito.UserPool(self, "UserPool",
                                      self_sign_up_enabled=False,
                                      sign_in_aliases=cognito.SignInAliases(username=True))
+        user_pool.apply_removal_policy(RemovalPolicy.DESTROY)
 
         # Generate a random string for the domain prefix
         random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
