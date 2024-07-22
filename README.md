@@ -1,53 +1,85 @@
-# Welcome to the Workshop Deployment Tool
+# AWS SageMaker Workshop Deployment Tool
 
-This tool facilitates the deployment of a Sagemaker workshop with a specified number of users.
+This tool automates the process of creating and destroying AWS workshops, including the setup of Cognito users, SageMaker profiles, and S3 buckets.
 
 ## Prerequisites
-- Clone this repository to your local machine.
+
+- Python 3.8 or higher
 - Ensure you have the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed.
+- AWS CDK installed
 - Ensure that your AWS account has been bootstrapped for CDK. Run `cdk bootstrap`
 
-## Setting Up a Virtual Environment and Installing Requirements
+## Installation
 
-Before running the deployment script, it's recommended to set up a virtual environment and install the necessary dependencies. Here are the steps:
+1. Clone this repository: `git clone <repository-url>` & `cd <repository-directory>`
 
-### Setting Up a Virtual Environment
+2. Create and activate a virtual environment:
 
-1. **Install `virtualenv` (if not already installed):**
+For macOS and Linux: `python3 -m venv venv` & `source venv/bin/activate`
 
-2. **Create a virtual environment:**
+For Windows: `python -m venv venv` & `.\venv\Scripts\activate`
 
-Replace `venv` with your preferred name for the virtual environment.
+3. Install the required Python packages: `pip install -r requirements.txt`
 
-3. **Activate the virtual environment:**
-- On Windows:
-  ```
-  venv\Scripts\activate
-  ```
-- On macOS and Linux:
-  ```
-  source venv/bin/activate
-  ```
+4. Ensure AWS CDK is installed and bootstrapped in your account: `npm install -g aws-cdk` & `cdk bootstrap`
 
-### Installing Requirements
+## Usage
 
-4. **Install dependencies from `requirements.txt`:**
+Ensure your virtual environment is activated, then run the main script: `python workshop_builder.py`
 
-## Deployment Steps
+Follow the prompts to either create or destroy a workshop.
 
-Once the virtual environment is set up and dependencies are installed, proceed with the deployment steps:
+### Creating a Workshop
 
-1. Run `python ./workshop_builder.py`.
-2. Ensure you are signed into your desired AWS account.
-3. Enter the AWS region where you want to deploy.
-4. Type `create` to initiate the workshop creation process.
-5. Choose the VPC where you want to deploy the Sagemaker Domain.
-6. Select the subnets for the Sagemaker Domain deployment.
-7. Specify the number of workshop users to create.
-8. Allow time for the deployment to finish. Details, including sign-in URL and user credentials, will be saved to a `users.csv` file.
+1. Sign in to your AWS account when prompted.
+2. Select or confirm the AWS region.
+3. Choose a VPC and subnet(s) for deployment.
+4. Enter the number of users to create.
+5. Provide a unique workshop name.
 
-## User Sign-In Steps
+The script will:
+- Deploy the CDK stack
+- Create Cognito users
+- Set up SageMaker profiles
+- Create S3 buckets
 
-1. Access the hosted URI provided in the `users.csv` file.
-2. Use the username and password from the `users.csv` file to log in.
-3. Users will be redirected to the Sagemaker console for workshop access.
+A CSV file with user login information will be generated.
+
+### Destroying a Workshop
+
+1. Sign in to your AWS account when prompted.
+2. Select or confirm the AWS region.
+3. Choose the workshop to destroy from the list of existing workshops.
+
+The script will:
+- Delete SageMaker spaces
+- Remove SageMaker user profiles
+- Delete Cognito users
+- Remove S3 buckets
+- Destroy the CDK stack
+
+## File Structure
+
+- `workshop_builder.py`: Main script for creating/destroying workshops
+- `create_cognito_users.py`: Script to create Cognito users
+- `create_sagemaker_profiles.py`: Script to create SageMaker profiles
+- `create_s3_buckets.py`: Script to create S3 buckets
+- `delete_spaces.py`: Script to delete SageMaker spaces
+- `delete_sagemaker_profiles.py`: Script to delete SageMaker profiles
+- `delete_cognito_users.py`: Script to delete Cognito users
+- `delete_s3_buckets.py`: Script to delete S3 buckets
+
+## Notes
+
+- Ensure you have the necessary AWS permissions to create and destroy resources.
+- The tool will create a CSV file with user login information for each workshop.
+- Be cautious when destroying workshops, as this action is irreversible.
+
+## Troubleshooting
+
+If you encounter any issues:
+1. Ensure your AWS CLI is properly configured.
+2. Check that you have the necessary permissions in your AWS account.
+3. Verify that all dependencies are correctly installed.
+
+For further assistance, please open an issue in the repository.
