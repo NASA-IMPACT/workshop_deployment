@@ -14,6 +14,6 @@ if not workshop_name:
     exit(1)
 
 stack = WorkshopDeploymentStack(app, f"{workshop_name}-WorkshopDeploymentStack", workshop_name=workshop_name)
-cdk.Tags.of(stack).add("project", "Workshop")
+cdk.Tags.of(stack).add("project", "cmt-workshop")
 
 app.synth()

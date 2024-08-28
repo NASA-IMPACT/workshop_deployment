@@ -266,15 +266,30 @@ def get_existing_workshop_names():
     csv_files = glob.glob("*-users.csv")
     return [os.path.splitext(file)[0].replace('-users', '') for file in csv_files]
 
+def is_valid_workshop_name(name):
+    """
+    Check if the workshop name is valid for AWS stack naming.
+    """
+    pattern = r'^[A-Za-z][A-Za-z0-9-]*$'
+    return re.match(pattern, name) is not None
+
 def get_unique_workshop_name():
-    """Prompt for a unique workshop name that doesn't exist in current CSV files."""
+    """
+    Prompt for a unique, valid workshop name that doesn't exist in current CSV files.
+    """
     existing_names = get_existing_workshop_names()
     while True:
-        workshop_name = input("Please enter the workshop name: ").strip()
+        workshop_name = input("Please enter the workshop name (must start with a letter and contain only letters, numbers, and hyphens): ").strip()
+        
+        if not is_valid_workshop_name(workshop_name):
+            print("Invalid workshop name. It must start with a letter and contain only letters, numbers, and hyphens.")
+            continue
+        
         if workshop_name in existing_names:
             print(f"A workshop named '{workshop_name}' already exists. Please choose a different name.")
-        else:
-            return workshop_name
+            continue
+        
+        return workshop_name
 
 if __name__ == "__main__":
     aws_sign_in()
@@ -293,6 +308,15 @@ if __name__ == "__main__":
         parameters = gather_parameters(region)
         num_users = input("Enter the number of users to create: ").strip()
         workshop_name = get_unique_workshop_name()
+        
+        # Construct the stack name
+        stack_name = f"{workshop_name}-WorkshopDeploymentStack"
+        
+        # Validate the full stack name
+        if not is_valid_workshop_name(stack_name):
+            print(f"Error: The resulting stack name '{stack_name}' is invalid. Please choose a shorter workshop name.")
+            exit(1)
+        
         deploy_output = deploy_cdk_stack(parameters, workshop_name)
 
         if deploy_output:

@@ -12,14 +12,22 @@ from aws_cdk import (
     CfnOutput,
     App,
     Duration,
-    RemovalPolicy
+    RemovalPolicy,
+    Tags
 )
 from constructs import Construct
+from datetime import datetime
 
 class WorkshopDeploymentStack(Stack):
 
     def __init__(self, scope: Construct, id: str, workshop_name: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
+
+        # Get the current date
+        creation_date = datetime.now().strftime("%Y-%m-%d")
+        # Add the workshop name as a tag to all resources in this stack
+        Tags.of(self).add("workshop", workshop_name)
+        Tags.of(self).add("creation-date", creation_date)
 
         # Parameters
         region_param = CfnParameter(self, "AWSRegion",
