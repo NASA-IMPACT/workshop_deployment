@@ -353,7 +353,7 @@ if __name__ == "__main__":
             stack_name = extract_stack_name_from_csv(csv_file)
             
             # Extract workshop name from the stack name
-            workshop_name = stack_name.split('-')[0]
+            workshop_name = stack_name.split('-WorkshopDeploymentStack')[0]
             
             destroy_cdk_stack(stack_name, workshop_name)
 
