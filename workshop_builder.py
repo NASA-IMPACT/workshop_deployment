@@ -259,7 +259,12 @@ def select_csv_file(region):
 
     file_index = int(input("Choose a CSV file (enter number): ")) - 1
     return valid_files[file_index]
-
+    
+def extract_stack_name_from_csv(csv_file):
+    """Extract the stack name from the CSV file name."""
+    stack_name = csv_file.split('-users.csv')[0]
+    return stack_name
+    
 def count_csv_rows(csv_file):
     """Count the number of rows in a CSV file."""
     with open(csv_file, 'r') as file:
