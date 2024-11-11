@@ -232,27 +232,33 @@ def select_csv_file(region):
     valid_files = []
     for file in csv_files:
         try:
-            df = pd.read_csv(file)
-            if df.apply(lambda row: row.astype(str).str.contains(region, na=False).any(), axis=1).any():
+            user_pool_id = None
+            with open(file, 'r') as f:
+                reader = csv.reader(f)
+                for _ in range(1):
+                    next(reader)  # Skip the first row
+                user_pool_id = next(reader)[1]  # Extract User Pool ID from the second row
+
+            # Check if the user pool ID exists in the current AWS account
+            cognito = boto3.client('cognito-idp', region_name=region)
+            try:
+                cognito.describe_user_pool(UserPoolId=user_pool_id)
                 valid_files.append(file)
+            except cognito.exceptions.ResourceNotFoundException:
+                pass
         except Exception as e:
             print(f"Error reading {file}: {e}")
 
     if not valid_files:
-        print(f"No existing workshops found in the '{region}' region.")
+        print(f"No existing workshops found in the '{region}' for the current account. Try switching regions or accounts.")
         return None
 
     print("Workshops available to delete:")
     for index, file in enumerate(valid_files, start=1):
         print(f"{index}. {file}")
-    
+
     file_index = int(input("Choose a CSV file (enter number): ")) - 1
     return valid_files[file_index]
-
-def extract_stack_name_from_csv(csv_file):
-    """Extract the stack name from the CSV file name."""
-    stack_name = csv_file.split('-users.csv')[0]
-    return stack_name
 
 def count_csv_rows(csv_file):
     """Count the number of rows in a CSV file."""
