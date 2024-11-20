@@ -1,4 +1,5 @@
 import subprocess
+import readline
 import boto3
 import os
 import re
@@ -8,6 +9,7 @@ import pandas as pd
 import csv
 from tqdm import tqdm
 import sys
+from add_workshop_users import add_users
 
 VALID_AWS_REGIONS = [
     'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
@@ -286,44 +288,50 @@ def is_valid_workshop_name(name):
 
 def get_unique_workshop_name():
     """
-    Prompt for a unique, valid workshop name that doesn't exist in current CSV files.
+    Prompt for a unique, valid workshop name with proper input handling.
     """
     existing_names = get_existing_workshop_names()
+    
     while True:
-        workshop_name = input("Please enter the workshop name (must start with a letter and contain only letters, numbers, and hyphens): ").strip()
-        
-        if not is_valid_workshop_name(workshop_name):
-            print("Invalid workshop name. It must start with a letter and contain only letters, numbers, and hyphens.")
-            continue
-        
-        if workshop_name in existing_names:
-            print(f"A workshop named '{workshop_name}' already exists. Please choose a different name.")
-            continue
-        
-        return workshop_name
+        try:
+            import sys
+            import tty
+            import termios
+            workshop_name = input("Please enter the workshop name (must start with a letter and contain only letters, numbers, and hyphens): ").strip()
+            
+            if not is_valid_workshop_name(workshop_name):
+                print("Invalid workshop name. It must start with a letter and contain only letters, numbers, and hyphens.")
+                continue
+            
+            if workshop_name in existing_names:
+                print(f"A workshop named '{workshop_name}' already exists. Please choose a different name.")
+                continue
+            
+            return workshop_name
+        except (KeyboardInterrupt, EOFError):
+            print("\nOperation cancelled.")
+            sys.exit(1)
 
 if __name__ == "__main__":
     aws_sign_in()
     region = set_aws_region()
 
     while True:
-        action = input("Would you like to create or destroy a workshop? (create/destroy) [create]: ").strip().lower()
-        if action in ['create', 'destroy', '']:
+        action = input("Would you like to create, update, or destroy a workshop? (create/update/destroy) [create]: ").strip().lower()
+        if action in ['create', 'update', 'destroy', '']:
             if action == '':
                 action = 'create'
             break
         else:
-            print("Invalid action. Please enter 'create' or 'destroy'.")
+            print("Invalid action. Please enter 'create', 'update', or 'destroy'.")
 
     if action == 'create':
         parameters = gather_parameters(region)
         num_users = input("Enter the number of users to create: ").strip()
         workshop_name = get_unique_workshop_name()
         
-        # Construct the stack name
         stack_name = f"{workshop_name}-WorkshopDeploymentStack"
         
-        # Validate the full stack name
         if not is_valid_workshop_name(stack_name):
             print(f"Error: The resulting stack name '{stack_name}' is invalid. Please choose a shorter workshop name.")
             exit(1)
@@ -345,12 +353,21 @@ if __name__ == "__main__":
         else:
             print("CDK deployment failed. Exiting.")
 
-    if action == 'destroy':
+    elif action == 'update':
+        csv_file = select_csv_file(region)
+        if csv_file:
+            num_new_users = int(input("Enter the number of new users to add: ").strip())
+            print("Adding new users...")
+            add_users(csv_file, num_new_users, region)
+            print(f"Successfully added {num_new_users} users to the workshop")
+            print(f"Updated user information available in {csv_file}")
+
+    elif action == 'destroy':
         csv_file = select_csv_file(region)
         if csv_file:
             workshop_name = extract_stack_name_from_csv(csv_file)
             num_rows = count_csv_rows(csv_file)
-            num_users = num_rows - 4  # Adjust num_users as specified
+            num_users = num_rows - 4
 
             print('Deleting spaces...')
             execute_script('delete_spaces.py', csv_file, region)
@@ -362,8 +379,6 @@ if __name__ == "__main__":
             execute_script('delete_s3_buckets.py', region, workshop_name, num_users)
 
             stack_name = extract_stack_name_from_csv(csv_file)
-            
-            # Extract workshop name from the stack name
             workshop_name = stack_name.split('-WorkshopDeploymentStack')[0]
             
             destroy_cdk_stack(stack_name, workshop_name)

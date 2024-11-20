@@ -2,7 +2,7 @@ import boto3
 import csv
 import sys
 import logging
-from create_cognito_users import create_cognito_user, generate_password
+from create_cognito_users import create_cognito_user, generate_safe_password
 from create_sagemaker_profiles import create_user_profile
 from create_s3_buckets import create_bucket
 
@@ -47,7 +47,7 @@ def add_users(csv_file, num_new_users, region):
         for i in range(num_new_users):
             user_num = start_num + i
             username = f"workshop-{user_num:03}"
-            password = generate_password()
+            password = generate_safe_password()
             
             # Create Cognito user
             response = create_cognito_user(cognito_client, username, password, user_pool_id)
