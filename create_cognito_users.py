@@ -8,14 +8,26 @@ import sys
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def generate_password():
-    while True:
-        password = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(12))
-        if (any(c.isupper() for c in password) and 
-            any(c.islower() for c in password) and 
-            any(c.isdigit() for c in password) and 
-            any(c in string.punctuation for c in password)):
-            return password
+def generate_safe_password():
+    """Generate a password that works reliably with Cognito."""
+    # Use a more limited set of special characters that are less likely to cause issues
+    special_chars = "!@#$%^&*"
+    
+    # Ensure at least one of each required character type
+    password = [
+        random.choice(string.ascii_uppercase),
+        random.choice(string.ascii_lowercase),
+        random.choice(string.digits),
+        random.choice(special_chars)
+    ]
+    
+    # Fill remaining length with random chars (avoiding problematic ones)
+    chars = string.ascii_letters + string.digits + special_chars
+    password.extend(random.choice(chars) for _ in range(8))  # Adding 8 more for 12 total
+    
+    # Shuffle the password
+    random.shuffle(password)
+    return ''.join(password)
 
 def create_cognito_user(client, username, temporary_password, user_pool_id):
     try:
@@ -60,7 +72,7 @@ def main(num_users, user_pool_id, sagemaker_domain_id, hosted_uri, region, works
 
         for i in range(1, num_users + 1):
             username = f"workshop-{i:03}"
-            temporary_password = generate_password()
+            temporary_password = generate_safe_password()
 
             response = create_cognito_user(client, username, temporary_password, user_pool_id)
 
