@@ -1,10 +1,19 @@
 import boto3
 import logging
 import sys
+import uuid
+import random
+import string
 from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def generate_random_string(length=6):
+    """
+    Generate a random string of lowercase letters and numbers.
+    """
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 def create_bucket(bucket_name, project_tag, region):
     """
@@ -18,10 +27,10 @@ def create_bucket(bucket_name, project_tag, region):
             CreateBucketConfiguration=location if region != 'us-east-1' else {}
         )
         logging.info(f"Bucket '{bucket_name}' created successfully in region '{region}'.")
-
+        
         # Get the current time
         creation_date = datetime.now().strftime("%Y-%m-%d")
-
+        
         s3.put_bucket_tagging(
             Bucket=bucket_name,
             Tagging={
@@ -33,8 +42,10 @@ def create_bucket(bucket_name, project_tag, region):
             }
         )
         logging.info(f"Tag added to bucket '{bucket_name}': Project={project_tag}.")
+        return True
     except Exception as e:
         logging.error(f"Error creating bucket '{bucket_name}': {e}")
+        return False
 
 def main():
     if len(sys.argv) != 4:
@@ -42,13 +53,34 @@ def main():
         sys.exit(1)
     
     region = sys.argv[1]
-    bucket_prefix = sys.argv[2]
+    original_prefix = sys.argv[2]
+    project_tag = original_prefix  # Keep original for tagging
+    bucket_prefix = original_prefix.lower()  # Convert to lowercase for bucket names
     num_buckets = int(sys.argv[3])  # Convert to integer
-    project_tag = sys.argv[2]
-
+    
+    # Generate a random suffix to make bucket names more unique
+    # Using both a UUID part and a timestamp to reduce collision probability
+    timestamp = datetime.now().strftime("%m%d%H%M")
+    random_suffix = generate_random_string(6)
+    
+    successful_buckets = []
     for i in range(1, num_buckets + 1):
-        bucket_name = f"{bucket_prefix}-{i:03}"
-        create_bucket(bucket_name, project_tag, region)
+        # Create bucket name with randomization
+        bucket_name = f"{bucket_prefix}-{timestamp}-{random_suffix}-{i:03}"
+        
+        # Ensure bucket name doesn't exceed 63 characters
+        if len(bucket_name) > 63:
+            # Truncate the prefix if needed
+            max_prefix_length = 63 - len(f"-{timestamp}-{random_suffix}-{i:03}")
+            bucket_name = f"{bucket_prefix[:max_prefix_length]}-{timestamp}-{random_suffix}-{i:03}"
+        
+        if create_bucket(bucket_name, project_tag, region):
+            successful_buckets.append(bucket_name)
+    
+    # Print summary
+    logging.info(f"Successfully created {len(successful_buckets)} out of {num_buckets} buckets")
+    for bucket in successful_buckets:
+        logging.info(f"Created: {bucket}")
 
 if __name__ == "__main__":
     main()
