@@ -41,7 +41,17 @@ def delete_app(domain_id, app_name, app_type, region, user_profile_name=None, sp
         return
     
     try:
-        subprocess.run(delete_command, check=True)
+        result = subprocess.run(delete_command, check=False, capture_output=True, text=True)
+        
+        # Check if the error is about the app already being deleted
+        if result.returncode != 0:
+            if "App [default] has already been deleted" in result.stderr:
+                logging.info(f"App: {app_name} of type: {app_type} from user profile: {user_profile_name} or space: {space_name} was already deleted.")
+                return
+            else:
+                # If it's a different error, raise it
+                subprocess.run(delete_command, check=True)
+                
         logging.info(f"Initiated deletion of app: {app_name} of type: {app_type} from user profile: {user_profile_name} or space: {space_name}")
     except subprocess.CalledProcessError as e:
         logging.error(f"Failed to delete app: {app_name} of type: {app_type} from user profile: {user_profile_name} or space: {space_name}. Error: {e}")

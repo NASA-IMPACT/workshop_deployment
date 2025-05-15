@@ -82,21 +82,36 @@ def get_bucket_list_from_csv(csv_file, workshop_name, region):
     return bucket_names
 
 def main():
-    if len(sys.argv) != 4:
-        logging.error("Usage: python delete_s3_buckets.py <region> <workshop_name> <number_of_buckets>")
+    if len(sys.argv) != 3:
+        logging.error("Usage: python delete_s3_buckets.py <csv_file> <region>")
         sys.exit(1)
     
-    region = sys.argv[1]
-    workshop_name = sys.argv[2]
-    num_buckets = int(sys.argv[3])  # Convert to integer
+    csv_file = sys.argv[1]
+    region = sys.argv[2]
     
-    # Check if a CSV file exists for this workshop
-    csv_file = f"{workshop_name}-users.csv"
+    # Extract workshop name from CSV filename
+    workshop_name = csv_file.split('-users.csv')[0]
+    
+    # Count users in CSV to determine number of buckets
+    num_buckets = 0
+    try:
+        with open(csv_file, 'r') as f:
+            reader = csv.reader(f)
+            # Skip the header rows (first 4 rows)
+            for _ in range(4):
+                next(reader)
+            # Count remaining rows (users)
+            num_buckets = sum(1 for _ in reader)
+    except Exception as e:
+        logging.error(f"Error reading bucket info from CSV: {e}")
+        num_buckets = 10  # Fallback to a default value
+    
     bucket_names = []
     
+    # Check if a CSV file exists for this workshop
     if os.path.exists(csv_file):
         logging.info(f"Found workshop CSV file: {csv_file}")
-        bucket_names = get_bucket_list_from_csv(csv_file, workshop_name, region)  # Pass region parameter here
+        bucket_names = get_bucket_list_from_csv(csv_file, workshop_name, region)
     
     # If no buckets found from CSV, fall back to searching by prefix
     if not bucket_names:

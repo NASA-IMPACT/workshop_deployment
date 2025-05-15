@@ -207,7 +207,7 @@ def execute_script(script_name, *args):
         str_args = [str(arg) for arg in args]
         
         with tqdm(total=0, desc=f"Running {script_name}", bar_format='{desc}: {elapsed}') as pbar:
-            result = subprocess.Popen(["python", script_name, *str_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.Popen([sys.executable, script_name, *str_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
             while result.poll() is None:
                 pbar.update(1)
